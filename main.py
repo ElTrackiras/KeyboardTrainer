@@ -18,43 +18,106 @@ class LetterBoxes:
         self.image = pygame.transform.scale(self.image, (self.height, self.width))
         LetterBoxes.all_boxes.append(self)
 
-    def exist(self, screen):
-        self.move()
+    def exist(self, screen, level):
+        self.move(level)
         box_letter = LetterBoxes.box_font.render(self.letter, True, (0, 0, 0))
         screen.blit(self.image, (self.x, self.y))
         screen.blit(box_letter, (self.x + (self.width/3), self.y + (self.height/5)))
 
-    def move(self):
-        self.x += 2
+    def move(self, level):
+        self.x += 2 * level
 
 
 class GameLoop:
-    game_window = pygame.display.set_mode((1000, 700))
+    window_width = 1000
+    window_height = 700
+    game_window = pygame.display.set_mode((window_width, window_height))
     game_run = True
     fps = pygame.time.Clock()
     pressed_letter_box = ''
     spawn_timer = 20
     alphabet = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z']
+    letters_taken = []
+    letters_available = []
+    in_game_font = pygame.font.SysFont("monospace", 30)
+    game_score = 0
+    lives = 10
+    current_screen = 'gameplay'
+    level = 1
+
+    @classmethod
+    def screen_controller(cls):
+        if cls.lives <= 0:
+            cls.current_screen = 'game_over'
+
+    @classmethod
+    def game_over_screen(cls):
+        game_over_font = pygame.font.SysFont("monospace", 30)
+        game_over_label = game_over_font.render('GAMEOVER', True, (255, 0, 0))
+        cls.game_window.blit(game_over_label, (300, 300))
+
+    @classmethod
+    def game_texts(cls):
+        score_label = cls.in_game_font.render('Score: ' + str(cls.game_score), True, (255, 0, 255))
+        cls.game_window.blit(score_label, (0, 0))
+        life_label = cls.in_game_font.render('Lives: ' + str(cls.lives), True, (255, 0, 255))
+        cls.game_window.blit(life_label, (300, 0))
+        ps = cls.in_game_font.render('Level: ' + str(cls.level), True, (255, 0, 255))
+        cls.game_window.blit(ps, (500, 0))
 
     @classmethod
     def spawn_boxes(cls):
         cls.spawn_timer -= 1
         if cls.spawn_timer <= 0:
-            box_monster = LetterBoxes(-20, random.randrange(0, 650), random.choice(cls.alphabet))
-            cls.spawn_timer = 30
+            cls.letters_available.clear()
+            for i in cls.alphabet:
+                if i not in cls.letters_taken:
+                    cls.letters_available.append(i)
+
+            if len(cls.letters_available) > 0:
+                chosen_letter = random.choice(cls.letters_available)
+                box_monster = LetterBoxes(-50, random.randrange(50, cls.window_height-50), random.choice(chosen_letter))
+                cls.letters_taken.append(chosen_letter)
+                cls.spawn_timer = 30
+            else:
+                cls.letters_taken.clear()
+                cls.spawn_timer = 300
 
         for i in LetterBoxes.all_boxes:
-            i.exist(cls.game_window)
+            i.exist(cls.game_window, cls.level)
             if cls.pressed_letter_box == i.letter:
+                cls.game_score += 1
                 LetterBoxes.all_boxes.remove(i)
 
+            if i.x > cls.window_width:
+                try:
+                    cls.letters_taken.remove(i.letter)
+                    LetterBoxes.all_boxes.remove(i)
+                    cls.lives -= 1
+
+                except:
+                    pass
+
         cls.pressed_letter_box = ''
+
+    @classmethod
+    def reset_variables(cls):
+        cls.lives = 10
+        cls.spawn_timer = 30
+        cls.game_score = 0
+        cls.level = 1
+        LetterBoxes.all_boxes.clear()
+        cls.letters_taken.clear()
+        cls.letters_available.clear()
 
     @classmethod
     def game_runner(cls):
         while cls.game_run:
             cls.game_window.fill((0, 0, 0))
             cls.fps.tick(60)
+            cls.screen_controller()
+            cls.level += 0.0001
+
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     quit()
@@ -112,8 +175,18 @@ class GameLoop:
                         cls.pressed_letter_box = 'n'
                     elif event.key == pygame.K_m:
                         cls.pressed_letter_box = 'm'
+                    elif event.key == pygame.K_SPACE:
+                        if cls.current_screen == 'game_over':
+                            cls.current_screen = 'gameplay'
+                            cls.reset_variables()
+                    if cls.pressed_letter_box in cls.letters_taken:
+                        cls.letters_taken.remove(cls.pressed_letter_box)
 
-            cls.spawn_boxes()
+            if cls.current_screen == 'game_over':
+                cls.game_over_screen()
+            else:
+                cls.game_texts()
+                cls.spawn_boxes()
             pygame.display.update()
 
 
